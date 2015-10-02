@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+
+        <title>Node.JS Threading Model</title>
+
+        <meta name="description" content="Node.JS Threading Model">
+        <meta name="author" content="Jordi Gomez">
+
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
+        <link rel="stylesheet" href="./../../reveal.js/css/reveal.css">
+        <link rel="stylesheet" href="./../../reveal.js/css/theme/solarized.css" id="theme">
+        <link rel="stylesheet" href="./../../reveal.js/lib/css/zenburn.css">
+        <link rel="stylesheet" href="./../../css/font-awesome.css">
+        <link rel="stylesheet" href="./../../css/presentation.css">
+
+        <!--[if lt IE 9]>
+        <script src="./../../reveal.js/lib/js/html5shiv.js"></script>
+        <![endif]-->
+    </head>
+    <body>
+        <div id="skyscanner-logo-container">
+            <img id="skyscanner-logo" src="./../../images/skyscanner_logo.png" alt="Skyscanner Logo">
+        </div>
+        <div class="reveal">
+            <div class="slides">
+                <section>
+                    <h1>Node.JS Threading Model</h1>
+                    <p>
+                        <small>By Jordi Gomez <a href="mailto:jordi.gomez@skyscanner.net">jordi.gomez@skyscanner.net</a></small><br/>
+                        <small>Senior Software Engineer at Skyscanner <a href="http://www.skyscanner.net">www.skyscanner.net</a></small>
+                        <small>Made with Reveal.js <a href="http://lab.hakim.se/reveal-js/">http://lab.hakim.se/reveal-js/</a></small>
+                    </p>
+                </section>
+                <section>
+                    <h3>I am not a full-time Node.JS developer</h3>
+                    <p>but I am passionate about researching new stuff</p>
+                </section>
+                <section>
+                    <h3>Node.JS is</h3>
+                    <ul>
+                        <li>Open-source</li>
+                        <li>A cross-platform runtime environment for Javascript
+                        <li>For server-side web applications</li>
+                        <li>Based on Google V8 JavaScript engine</li>
+                        <li>Which is written in C++</li>
+                        <li>Hosted by the Node.js Foundation</li>
+                        <li>Which is a collaborative project at Linux Foundation<ul>
+                    </ul>
+                    <p>
+                        <small>Source: wikipedia <a href="https://en.wikipedia.org/wiki/Node.js">https://en.wikipedia.org/wiki/Node.js</a></small>
+                    </p>
+                </section>
+                <section>
+                    <h3>Made of</h3>
+                    <img src="./images/arch.png" alt="Stack" style="background-color: #AAA">
+                    <p>
+                        <small>Source: <a href="http://apps-masters.com/database/amazing-features-node-js-top-5-server-side-scripts/">http://apps-masters.com/database/amazing-features-node-js-top-5-server-side-scripts/</a></small>
+                        <small>Source: <a href="https://github.com/nodejs/node-v0.x-archive/tree/master/deps">https://github.com/nodejs/node-v0.x-archive/tree/master/deps</a></small>
+                    </p>
+                </section>  
+                <section>
+                    <h3>NPM - Package Manager for Javascript</h3>
+                    <ul>
+                        <li>Allows to install Javascript packages</li>
+                        <li>Default for Node.JS</li>
+                        <li>Simple to use:
+                            <pre><code class="sh">$ npm search express</code></pre>
+                            <pre><code class="sh">$ npm install express</code></pre>
+                            <pre><code class="sh">$ npm uninstall express</code></pre>
+                        </li>
+                    </ul>
+                </section>
+                <section>
+                    <h3>Code looks like</h3>
+                    <ul>
+                        <li>Install some packages</li>
+                            <pre><code class="sh">$ npm install connect serve-static</code></pre>
+                        <li>server.js</li>
+                            <pre><code class="javascript" data-trim>
+var connect = require('connect');
+var serveStatic = require('serve-static');
+var server = connect().use(serveStatic(__dirname))
+server.listen(8080);
+                            </code></pre>
+                        <li>Run a static file server</li>
+                            <pre><code>$ node server.js</code></pre>
+                    </ul>
+                    <p>
+                        <small>Source: <a href="http://stackoverflow.com/questions/6084360/using-node-js-as-a-simple-web-server">http://stackoverflow.com/questions/6084360/using-node-js-as-a-simple-web-server</a></small>
+                    </p>
+                </section>
+                <section>
+                    <h3>Browse it</h3>
+                    <img src="./images/static1.png" alt="Browser">
+                </section>
+                <section>
+                    <h3>Something a little more complex</h3>
+                    <section>
+                        <pre><code class="javascript" data-trim style="max-height: 500px;">
+var http = require("http"),
+    url = require("url"),
+    path = require("path"),
+    fs = require("fs"),
+    memcached = require('memcached');   
+
+var error = function(response, status, err) {
+  response.writeHead(status, {"Content-Type": "text/plain"});
+  response.write(err + "\n");
+  response.end();
+};
+
+var success = function(response, data) {
+  response.writeHead(200);
+  response.write(data, "binary");
+  response.end();
+};
+
+var cache = new memcached('localhost:11211');
+                        </code></pre>
+                    </section>
+                    <section>
+                        <pre><code class="javascript" data-trim style="max-height: 500px;">
+http.createServer(function(request, response) {
+  var uri = url.parse(request.url).pathname,
+      filename = path.join(process.cwd(), uri);
+
+  cache.get(filename, function(err, data) {
+    if (data !== undefined) return success(response, data);
+
+    fs.exists(filename, function(exists) {
+      if(!exists) return error(response, 404, "404 Not Found");
+
+      fs.readFile(filename, "binary", function(err, file) {
+        if(err) return error(response, 500, err);
+
+        cache.set(filename, file, 10, function (err) {
+          success(response, file);
+        });
+      });
+    });
+  });
+}).listen(8080);
+                        </code></pre>
+                    </section>
+                </section>
+                <section>
+                    <h3>That's basically I/O</h3>
+                    <ul>
+                        <li>We access memcache: network</li>
+                        <li>We read the file: disk</li>
+                        <li>We access memcache again: network</li>
+                        <li>The same with database access or external services</li>
+                        <li>Slow operations: wait for the OS to signal the completion</li>
+                    </ul>
+                </section>
+                <section>
+                    <h3>The cost of I/O</h3>
+                    <div data-markdown>
+                        <script type="text/template">
+| operation | cycles |
+| ------------- |:-------------:|
+| L1-cache | 3 |
+| L2-cache | 14 | 
+| RAM | 250 |
+| Disk | 41,000,000 | 
+| Network | 240,000,000  |  
+                        </script>
+                    </div>
+                    <p>
+                        <small>Source: <a href="http://blog.mixu.net/2011/02/01/understanding-the-node-js-event-loop/">http://blog.mixu.net/2011/02/01/understanding-the-node-js-event-loop/</a></small>
+                    </p>
+                </section>
+                <section>
+                    <h3>Threading models</h3>
+                    <ul>
+                        <li>Single thread (Python)</li>
+                        <li>Multiple threads (Java)</li>
+                        <li>Multiple processes (Apache+PHP)</li>
+                        <li>Single thread, event driven (NodeJS, Python+AsyncIO)</li>
+                    </ul>
+                </section>
+                <section>
+                    <h3>The event loop</h3>
+                    <section>
+                        <ul>
+                            <li>Single thread but ...</li>
+                            <li>... event driven programmed</li>
+                            <li>Based on libuv (low-level library)</li>
+                            <li>No support for some operations async in Kernel</li>
+                            <li>Background threads in libuv do the wait ...</li>
+                            <li>... so everything runs in parallel BUT our code</li>
+                        </ul>
+                    </section>
+                    <section>
+                        <img src="./images/chart2.png" alt="Event loop" height="80%" width="80%" style="background-color: #EEE;">
+                        <ul>
+                            <li>Every call that involves I/O, requires a callback</li>
+                            <li>Usually, yields control to the event loop</li>
+                            <li>When I/O completed, push the callback to the event loop</li>
+                        </ul>
+                    </section>
+                </section>
+                <section>
+                    <h3>Advantages</h3>
+                    <section>
+                        <img src="./images/threadsafe.png" alt="Event loop" height="60%" width="60%" style="background-color: #EEE;">
+                        <ul>
+                            <li>Inherently thread safe: no race conditions</li>
+                            <li>Just callbacks</li>
+                            <li>Easy parallelism for I/O</li>
+                        </ul>
+                    </section>
+                </section>
+                <section>
+                    <h3>Disadvantages</h3>
+                    <section>
+                        <ul>
+                            <li>CPU-intensive work blocks the process</li>
+                            <li>Memory leaks
+                                <pre><code class="javascript" data-trim>
+function(base, cb) {
+    // Closure used in the callback.
+    var obj = new LeakObject();
+    var once = function(e) {
+        cb(e.type, obj);
+        base.removeListener('change', once);
+    };
+    base.on("change", once);
+    // obj will be freed!
+}
+                                </code></pre>
+                            </li>
+                            <li>Debug is not easy</li>
+                        </ul>
+                    </section>
+                </section>
+                <section>
+                    <h3>libuv</h3>
+                    <section>
+                        <img src="./images/libuv.png" alt="Callback queue" height="60%" width="60%">
+                        <small>
+                        <ul>
+                            <li>Async network I/O: an event is placed in the poll queue when the OS reports activity</li>
+                            <li>Async filesystem I/O: normal blocking system calls in a separate thread from the pool</li>
+                        </ul>
+                        </small>
+                        <p>
+                            <small>Source: <a href="http://libuv.readthedocs.org/en/latest/design.html">http://libuv.readthedocs.org/en/latest/design.html</a></small>
+                        </p>
+                    </section>
+                </section>
+                <section>
+                    <h3>libuv: the I/O loop</h3>
+                    <section>
+                        <img src="./images/callbackqueue.png" alt="Callback queue" height="60%" width="60%" style="background-color: #EEE;">
+                        <small>
+                        <ul>
+                            <li>The loop is alive if referenced handles, active requests or closing handles</li>
+                            <li>The entire callback queue is processed in each event loop iteration</li>
+                            <li>setImmediate: end of the iteration</li>
+                            <li>process.nextTick: end of the iteration phase (beware of recursive starvation!)</li>
+                        </ul>
+                        </small>
+                    </section>
+                </section>
+                <section>
+                    <h3>Multiple processes</h3>
+                    <ul>
+                        <li>One Node.JS server process per core</li>
+                        <li>Cluster module (should scale linearly)
+                            <pre><code class="javascript" data-trim>
+if (cluster.isMaster) {
+  // Fork workers.
+  for (var i = 0; i < numCPUs; i++) {
+    cluster.fork();
+  }
+} else {
+  http.Server(function(req, res) { ... }).listen(8000);
+}
+                            </code></pre>
+                        </li>
+                        <li>Or other cores can do the CPU intensive work (maybe Web Workers)</li>
+                        <li>With socket.io, which does multiple connections for handshare, sticky-session module.</li>
+                    </ul>
+                    <p>
+                        <small>Source: <a href="http://stackoverflow.com/questions/2387724/node-js-on-multi-core-machines">http://stackoverflow.com/questions/2387724/node-js-on-multi-core-machines</a></small>
+                    </p>
+                </section>
+                <section>
+                    <h3>Let's pick a fight</h3>
+                    <section>
+                        <p>With PHP, 1K concurrent, 100K completed</p>
+                        <div data-markdown>
+                        <script type="text/template">
+|               | NodeJS           | Apache PHP |
+| ------------- |:-------------:| -----:|
+| Time taken for tests (s) | 21.162 | 121.451 |
+| Failed requests | 147 | 879 | 
+| Total transferred (bytes) | 8,096,031 | 29,338,635 |
+| Requests per second | 4,725.43 | 823.38 | 
+| Time per request (ms) | 0.212  | 1.215 | 
+
+                        </script>
+                        </div>
+                        <p>
+                            <small>Source: <a href="http://www.hostingadvice.com/blog/comparing-node-js-vs-php-performance/">http://www.hostingadvice.com/blog/comparing-node-js-vs-php-performance/</a></small>
+                        </p>
+                    </section>
+                    <!--
+                    <section>
+                        <p>With Java (ShineTech)</p>
+                        <img src="./images/static2.png" alt="With Java" height="70%" width="70%">
+                        <p>
+                            <small>Source: <a href="http://blog.shinetech.com/2013/10/22/performance-comparison-between-node-js-and-java-ee/">http://blog.shinetech.com/2013/10/22/performance-comparison-between-node-js-and-java-ee/</a></small>
+                        </p>
+                    </section>
+                    -->
+                    <section>
+                        <p>With Java (Paypal)</p>
+                        <img src="./images/paypal2.gif" alt="With Java again" height="100%" width="100%">
+                        <p>
+                            <small>Source: <a href="https://www.paypal-engineering.com/2013/11/22/node-js-at-paypal/">https://www.paypal-engineering.com/2013/11/22/node-js-at-paypal/</a></small>
+                        </p>
+                    </section>
+                </section>
+                <section>
+                    <h3>Some conclusions</h3>
+                    <ul>
+                        <li>Ideal for IO-bounded (network or disk)</li>
+                        <li>Not suited for CPU-bounded tasks</li>
+                        <li>Callback paradigm (libuv background threads wait)</li>
+                        <li>Sometimes not very intuitive</li>
+                    </ul>
+                </section>
+                <section>
+                    <h3>Interesting References</h3>
+                    <small>
+                    <ul>
+                        <li>"Nodejs in flames": http://techblog.netflix.com/2014/11/nodejs-in-flames.html</li>
+                        <li>"600k concurrent websocket connections":http://www.jayway.com/2015/04/13/600k-concurrent-websocket-connections-on-aws-using-node-js/</li>
+                        <li>"Understanding process.nextTick": http://howtonode.org/understanding-process-next-tick</li>
+                        <li>"C++ bindings with Node.JS": https://pravinchavan.wordpress.com/2013/11/08/c-binding-with-node-js/</li>
+                        
+                        <li>"Architecture of NodeJS": http://mcgill-csus.github.io/student_projects/Submission2.pdf</li>
+                        <li>http://chimera.labs.oreilly.com/books/1234000001808/ch03.html#using_multiple_processors</li>
+                    </ul>
+                    </small>
+                </section>
+                <section>
+                    <h3>Interestint stackoverflow References</h3>
+                    <small>
+                    <ul>
+                        <li>http://stackoverflow.com/questions/2353818/how-do-i-get-started-with-node-js</li>
+                        <li>http://stackoverflow.com/questions/1884724/what-is-node-js</li>
+                        <li>http://stackoverflow.com/questions/14795145/how-the-single-threaded-non-blocking-io-model-works-in-node-js</li>
+                        <li>http://stackoverflow.com/questions/6084360/using-node-js-as-a-simple-web-server</li>
+                        <li>http://stackoverflow.com/questions/22847406/what-steps-does-node-js-takes-to-execute-a-program</li>
+                        <li>http://stackoverflow.com/questions/23893872/how-to-properly-remove-event-listeners-in-node-js-eventemitter</li>
+                        <li>http://stackoverflow.com/questions/25568613/node-js-event-loop</li>
+                    </ul>
+                    </small>
+                </section>
+                <section>
+                    <h3>Thanks</h3>
+                </section>
+                <section>
+                    <h3>Skyscanner</h3>
+                    <ul>
+                        <li>Travel smarter with Skyscanner.</li>
+                        <li>Leading global travel search site offering an unbiased, comprehensive and free flight search service as well as online comparisons for hotels and car hire.</li>
+                        <li>Founded: 2003</li>
+                        <li>700 global employees, 50 nationalities</li>
+                        <li>9 global offices</li>
+                        <li>40m+ unique monthly visitors</li>
+                        <li>35m+ app downloads</li>                   
+                    </ul>
+                </section>
+            </div>
+        </div>
+
+        <script src="./../../reveal.js/lib/js/head.min.js"></script>
+        <script src="./../../reveal.js/js/reveal.js"></script>
+
+        <script>
+
+            // Full list of configuration options available at:
+            // https://github.com/hakimel/reveal.js#configuration
+            Reveal.initialize({
+                controls: true,
+                progress: true,
+                history: true,
+                center: true,
+
+                transition: 'slide', // none/fade/slide/convex/concave/zoom
+
+                // Optional reveal.js plugins
+                dependencies: [
+                    { src: './../../reveal.js/lib/js/classList.js', condition: function() { return !document.body.classList; } },
+                    { src: './../../reveal.js/plugin/markdown/marked.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+                    { src: './../../reveal.js/plugin/markdown/markdown.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+                    { src: './../../reveal.js/plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } },
+                    { src: './../../reveal.js/plugin/zoom-js/zoom.js', async: true },
+                    { src: './../../reveal.js/plugin/notes/notes.js', async: true }
+                ]
+            });
+
+        </script>
+
+    </body>
+</html>
+
+
+

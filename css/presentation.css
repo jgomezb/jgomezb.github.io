@@ -1,0 +1,29 @@
+body {
+    background-color: #34363d;
+    color: d6d9dd;
+}
+
+#skyscanner-logo {
+    float: right;
+    height: 95%;
+}
+
+#skyscanner-logo-container {
+    background-color: #d6d9dd;
+    height: 10%;
+    max-height: 70px;
+}
+
+.reveal {
+    font-family: arial, sans-serif;
+    color: #d6d9dd;
+}
+
+.reveal h1, .reveal h2, .reveal h3, .reveal h4, .reveal h5, .reveal h6 {
+    color: #a1eef5;
+}
+
+.reveal a {
+    color: #44cdde;
+}
+
